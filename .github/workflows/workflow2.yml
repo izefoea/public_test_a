@@ -24,7 +24,7 @@ jobs:
       # 路径是相对于主仓库根目录的
       # 格式: ./<submodule_path_in_.gitsubmodules>/.github/workflows/<workflow_file_name.yml>
       - name: Call Workflow 1 from Submodule
-        uses: ./path_to_submodule/.github/workflows/workflow1.yml # <--- 重要：替换 'path_to_submodule'
+        uses: ./.github/workflows/workflow11.yml # <--- 重要：替换 'path_to_submodule'
         secrets:
           # 将主仓库的 'test' secret 传递给可调用的 workflow1
           # workflow1 在其 workflow_call 定义中声明了它需要一个名为 'test' 的 secret
