@@ -1,31 +1,26 @@
 # .github/workflows/workflow2.yml
-# This workflow resides in the main repository.
-# It checks out a submodule and calls a workflow from that submodule.
-
-name: Workflow 2 - Caller of Submodule Workflow
+name: Workflow 2 – Caller of Submodule Workflow
 
 on:
   push:
-    branches:
-      - main # 或者你的默认分支
-  workflow_dispatch: # 允许手动触发
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
-  call_workflow_from_submodule:
+  # 第一个 Job：检出主仓库及其子模块
+  checkout_submodules:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository including submodules
-        uses: actions/checkout@v4 # 建议使用最新版本
+        uses: actions/checkout@v4
         with:
-          submodules: 'recursive' # 或者 'true'，确保子模块被检出
+          submodules: 'recursive'
 
-      # 调用子模块中的 workflow1.yml
-      # 路径是相对于主仓库根目录的
-      # 格式: ./<submodule_path_in_.gitsubmodules>/.github/workflows/<workflow_file_name.yml>
-      - name: Call Workflow 1 from Submodule
-        uses: ./.github/workflows/workflow11.yml # <--- 重要：替换 'path_to_submodule'
-        secrets:
-          # 将主仓库的 'test' secret 传递给可调用的 workflow1
-          # workflow1 在其 workflow_call 定义中声明了它需要一个名为 'test' 的 secret
-          test: ${{ secrets.test }}
+  # 第二个 Job：调用子模块中的可重用 Workflow，需要先完成检出
+  call_workflow_from_submodule:
+    needs: checkout_submodules
+    # job-level uses 调用子模块里的 workflow1.yml
+    uses: ./path_to_submodule/.github/workflows/workflow1.yml
+    secrets:
+      # 将主仓库的 test secret 传递给子模块 workflow_call
+      test: ${{ secrets.test }}
