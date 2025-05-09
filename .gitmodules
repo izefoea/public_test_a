@@ -1,3 +1,6 @@
 [submodule "path_to_submodule"]
 	path = path_to_submodule
 	url = git@github.com:izefoea/public_test_b.git
+[submodule "private_test_c"]
+	path = private_test_c
+	url = git@github.com:izefoea/private_test_c.git
