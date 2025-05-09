@@ -1,0 +1,59 @@
+# .github/workflows/workflow1.yml
+# This workflow is intended to be called by another workflow.
+# It resides in the submodule repository.
+
+name: Workflow 1 - Callable Secret User
+
+on:
+  workflow_call: # Makes this workflow callable
+    secrets:
+      test: # Define the secret that this callable workflow expects
+        required: true
+
+jobs:
+  use_double_encoded_secret:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Access and double encode secret
+        env:
+          # GitHub Actions will automatically mask direct secret usage in logs.
+          # We are receiving 'test' secret from the caller workflow.
+          TEST_SECRET: ${{ secrets.test }}
+        run: |
+          echo "Attempting to use the secret (value will be masked if directly printed)..."
+
+          # Double Base64 encode the secret
+          # Step 1: First Base64 encoding
+          SECRET_B64_ONCE=$(echo -n "$TEST_SECRET" | base64)
+          echo "First Base64 encoding (intermediate, should not be logged if sensitive)"
+
+          # Step 2: Second Base64 encoding
+          SECRET_B64_TWICE=$(echo -n "$SECRET_B64_ONCE" | base64)
+          echo "Double Base64 Encoded Secret: $SECRET_B64_TWICE"
+
+          # Store it as an output if needed for subsequent steps in this job,
+          # or just use it within this script.
+          echo "::set-output name=double_encoded_secret::$SECRET_B64_TWICE"
+
+      - name: Demonstrate decoding and using the secret (example)
+        env:
+          DOUBLE_ENCODED_SECRET_FROM_PREVIOUS_STEP: ${{ steps.use_double_encoded_secret.outputs.double_encoded_secret }}
+        run: |
+          echo "Received double encoded secret: $DOUBLE_ENCODED_SECRET_FROM_PREVIOUS_STEP"
+
+          # Double Base64 decode
+          # Step 1: First Base64 decoding
+          DECODED_ONCE=$(echo -n "$DOUBLE_ENCODED_SECRET_FROM_PREVIOUS_STEP" | base64 -d)
+          echo "Decoded once (intermediate)"
+
+          # Step 2: Second Base64 decoding to get the original secret
+          ORIGINAL_SECRET_VALUE=$(echo -n "$DECODED_ONCE" | base64 -d)
+
+          # Now you can use ORIGINAL_SECRET_VALUE.
+          # Be careful about printing it directly to logs, as GitHub might still mask it
+          # if the original value is recognized as a secret pattern.
+          # The double encoding helps primarily against accidental log exposure of the raw value
+          # if a simple echo was used or if it formed part of a URL/command that gets logged.
+          echo "Original secret has been decoded and can be used."
+          echo "For demonstration, let's show its length: ${#ORIGINAL_SECRET_VALUE}"
+          echo "Secret used successfully (actual value not printed to avoid masking issues)."
