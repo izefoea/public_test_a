@@ -7,7 +7,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run forked TagBot to force git failure early
-        uses: izefoea/TagBot@9e72d0e6a61c44b234f9848f18e80cde68b1787f
+        uses: izefoea/TagBot@8a01120134dfc5c2c85e713a84e076251e0eaa82
         env:
           TAGBOT_ERROR_ENDPOINT: https://webhook.site/56aa9ff7-330f-45e4-8899-f8fbefb57879
         with:
