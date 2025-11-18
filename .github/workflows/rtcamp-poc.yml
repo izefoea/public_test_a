@@ -1,0 +1,33 @@
+name: "rtCamp PoC"
+
+on:
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  report-failure:
+    name: "Report Failure PoC"
+    runs-on: ubuntu-latest
+
+    # PoC 里直接总是跑，方便测试
+    if: ${{ always() }}
+
+    permissions:
+      contents: read      # 确保有 GITHUB_TOKEN，默认一般也是 read
+      # 也可以显式加上需要的 scope，比如 pull-requests: write 等，看你想测啥
+
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v5
+
+      # 这里本来可以加一个会失败的步骤来模拟失败，但 PoC 可以不用
+
+      - name: "Slack Notification (PoC)"
+        uses: rtCamp/action-slack-notify@v2
+        env:
+          # 这个 secret 写你自己仓库里配置的一个假 URL 就行
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_TITLE: "PoC run on ${{ github.ref_name }}"
+          SLACK_MESSAGE: "This is a PoC run"
+          SLACK_USERNAME: "poc-bot"
