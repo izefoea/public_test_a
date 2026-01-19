@@ -6,7 +6,10 @@ on:
 jobs:
   demo:
     runs-on: ubuntu-latest
-
+    permissions:
+      actions: write   # 允许删除 artifacts
+      contents: read
+      
     steps:
       - name: Create first artifact content
         run: |
