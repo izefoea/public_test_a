@@ -1,0 +1,46 @@
+name: artifact-remove-and-reupload
+
+on:
+  workflow_dispatch:
+
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Create first artifact content
+        run: |
+          mkdir -p out
+          cat > out/demo.txt <<'EOF'
+          First upload
+          timestamp: $(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          random: $RANDOM
+          EOF
+
+      - name: Upload artifact (first)
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-artifact
+          path: out/demo.txt
+          if-no-files-found: error
+
+      - name: Remove artifact by name
+        uses: c-hive/gha-remove-artifacts@v1
+        with:
+          age: '1 second'
+
+      - name: Create second artifact content
+        run: |
+          mkdir -p out
+          cat > out/demo.txt <<'EOF'
+          Second upload (different content)
+          timestamp: $(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          note: this file content changed after deletion
+          EOF
+
+      - name: Upload artifact (second, same name)
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-artifact
+          path: out/demo.txt
+          if-no-files-found: error
