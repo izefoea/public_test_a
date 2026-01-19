@@ -3,10 +3,6 @@ name: artifact-remove-and-reupload-2jobs
 on:
   workflow_dispatch:
 
-permissions:
-  contents: read
-  actions: write   # 第二个 job 删除 artifacts 需要
-
 jobs:
   upload_first:
     runs-on: ubuntu-latest
