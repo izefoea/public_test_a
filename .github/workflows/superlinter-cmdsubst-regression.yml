@@ -2,27 +2,6 @@ name: super-linter cmdsubst regression (no PR)
 
 on:
   workflow_dispatch:
-    inputs:
-      action_ref:
-        description: "Action ref to test (e.g., v8.2.1, v8, v7, commit SHA)"
-        required: true
-        default: "v8.2.1"
-      validate_markdown:
-        description: "Whether to validate markdown (true/false)"
-        required: true
-        default: "true"
-      validate_all_codebase:
-        description: "Whether to validate all codebase (true/false). Use false to force changed-files path."
-        required: true
-        default: "false"
-      default_branch:
-        description: "Base branch name for diff"
-        required: true
-        default: "main"
-      log_level:
-        description: "LOG_LEVEL (DEBUG/INFO/WARN/ERROR)"
-        required: true
-        default: "DEBUG"
 
 jobs:
   repro:
@@ -32,43 +11,55 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
+          # Workspace is empty unless you checkout; we create a synthetic git repo here.
           rm -rf ./* ./.git || true
 
+          # Create a bare "origin" so origin/main exists (super-linter often diffs against origin/<DEFAULT_BRANCH>)
           mkdir -p /tmp/origin.git
           git init --bare /tmp/origin.git
 
-          git init -b "${{ inputs.default_branch }}"
+          git init -b main
           git config user.email "test@example.com"
           git config user.name "test"
           git remote add origin /tmp/origin.git
 
+          # Base commit on main
           printf "base\n" > README.md
           git add -A
           git commit -qm "base"
-          git push -u origin "${{ inputs.default_branch }}"
+          git push -u origin main
 
+          # Feature branch with crafted filename
           git checkout -b feature
           rm -f .CMD_SUBST_RAN
 
-          # Filename contains literal $(...) but no '/' characters at creation time.
-          # At runtime, it builds /github/workspace/.CMD_SUBST_RAN using octal escapes.
+          # Filename must not contain '/' (creation-time). We generate /github/workspace/.CMD_SUBST_RAN at runtime.
           printf "dummy\n" > 'pre$(p=$(printf "\057github\057workspace\057.CMD_SUBST_RAN"); touch "$p").md'
 
           git add -A
           git commit -qm "add crafted filename"
           git push -u origin feature
 
+          # Stay on feature
           git status --porcelain
-          echo "Prepared repo at: $PWD"
 
       - name: Run super-linter (pinned) in changed-files mode
-        uses: ${{ format('super-linter/super-linter/slim@{0}', inputs.action_ref) }}
+        uses: super-linter/super-linter/slim@v8.2.1
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          VALIDATE_ALL_CODEBASE: ${{ inputs.validate_all_codebase }}
-          DEFAULT_BRANCH: ${{ inputs.default_branch }}
-          VALIDATE_MARKDOWN: ${{ inputs.validate_markdown }}
-          LOG_LEVEL: ${{ inputs.log_level }}
+
+          # Force "only changed files" behavior (the code path you hit in PRs)
+          VALIDATE_ALL_CODEBASE: "false"
+
+          # Ensure the diff base is our synthetic main branch
+          DEFAULT_BRANCH: "main"
+
+          # Keep runtime smaller; still ensures the crafted .md is considered.
+          VALIDATE_MARKDOWN: "true"
+
+          # Optional: more logs if you need debugging
+          LOG_LEVEL: "DEBUG"
 
       - name: Assert marker not created
         shell: bash
