@@ -7,6 +7,7 @@ import getpass
 import socket
 import os
 import platform
+import json
 from datetime import datetime
 
 
@@ -24,28 +25,28 @@ class UserIdentity:
         """Get the current username"""
         try:
             return getpass.getuser()
-        except Exception:
+        except (OSError, KeyError):
             return "Unknown"
     
     def _get_hostname(self):
         """Get the hostname"""
         try:
             return socket.gethostname()
-        except Exception:
+        except (OSError, socket.gaierror):
             return "Unknown"
     
     def _get_os(self):
         """Get the operating system information"""
         try:
             return f"{platform.system()} {platform.release()}"
-        except Exception:
+        except (OSError, AttributeError):
             return "Unknown"
     
     def _get_home_dir(self):
         """Get the home directory"""
         try:
             return os.path.expanduser("~")
-        except Exception:
+        except (OSError, RuntimeError):
             return "Unknown"
     
     def who_are_you(self):
@@ -76,7 +77,6 @@ def main():
     print(identity)
     print("\n" + "=" * 50)
     print("JSON format:")
-    import json
     print(json.dumps(identity.who_are_you(), indent=2))
 
 
