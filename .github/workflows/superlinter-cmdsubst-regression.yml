@@ -55,17 +55,16 @@ jobs:
       # But to respect your "Action context" requirement, let's use the docker container directly 
       # which mimics the action's behavior closely.
       
-      - name: 2. Run Super-Linter via Docker (Simulating Action)
+      - name: 2. Run Super-Linter via Docker (Exact Reproduction)
         run: |
-          echo "Testing against image: super-linter/super-linter:${{ inputs.target_version }}"
+          echo "Testing against image version: ${{ inputs.target_version }}"
           
-          # Mount current workspace same as the Action does
           docker run --rm \
             -e RUN_LOCAL=true \
+            -e VALIDATE_ALL_CODEBASE=true \
             -e GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} \
             -v "$(pwd):/tmp/lint" \
-            ghcr.io/super-linter/super-linter:${{ inputs.target_version }} \
-            /bin/bash -c "echo 'Container started'; /action/lib/linter.sh || true"
+            ghcr.io/super-linter/super-linter:${{ inputs.target_version }}
             
       - name: 3. Check Result
         run: |
