@@ -1,0 +1,77 @@
+name: super-linter cmdsubst regression
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "super-linter image tag to test (e.g., slim-v8.2.1, slim-v8.3.2)"
+        required: true
+        default: "slim-v8.3.2"
+      validate_all_codebase:
+        description: "set VALIDATE_ALL_CODEBASE (true/false)"
+        required: true
+        default: "true"
+
+jobs:
+  repro:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Prepare minimal repo with crafted filename
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf testrepo
+          mkdir -p testrepo
+          cd testrepo
+
+          git init -q
+          git config user.email "test@example.com"
+          git config user.name "test"
+
+          # Ensure marker doesn't exist
+          rm -f .CMD_SUBST_RAN
+
+          # Create a filename that CONTAINS literal $(...) (single quotes prevent local shell expansion)
+          # If vulnerable, the container will execute: touch /tmp/lint/.CMD_SUBST_RAN
+          printf "dummy\n" > 'pre$(touch /tmp/lint/.CMD_SUBST_RAN).md'
+
+          git add -A
+          git commit -qm "add crafted filename"
+
+      - name: Run super-linter image and assert no cmdsubst execution
+        shell: bash
+        env:
+          TAG: ${{ inputs.image_tag }}
+          VALIDATE_ALL: ${{ inputs.validate_all_codebase }}
+        run: |
+          set -euo pipefail
+          IMAGE="ghcr.io/super-linter/super-linter:${TAG}"
+
+          cd testrepo
+          rm -f .CMD_SUBST_RAN
+
+          # Run the container. We don't treat the linter's exit code as the test result,
+          # because lint failures are normal for minimal repos.
+          docker run --rm \
+            -e RUN_LOCAL=true \
+            -e VALIDATE_ALL_CODEBASE="${VALIDATE_ALL}" \
+            -v "$PWD":/tmp/lint \
+            "$IMAGE" >stdout.log 2>stderr.log || true
+
+          if [ -f ".CMD_SUBST_RAN" ]; then
+            echo "::error::[VULNERABLE] Command substitution appears to have executed (marker file created)."
+            echo "::error::Image: $IMAGE"
+            exit 1
+          else
+            echo "[OK] No marker file created; filename likely treated as data."
+            echo "Image: $IMAGE"
+          fi
+
+      - name: Upload logs (optional)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: super-linter-cmdsubst-logs
+          path: |
+            testrepo/stdout.log
+            testrepo/stderr.log
