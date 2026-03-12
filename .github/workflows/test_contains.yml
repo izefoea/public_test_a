@@ -1,0 +1,36 @@
+name: Test contains behavior
+
+on:
+  workflow_dispatch:
+
+env:
+  TRUSTED_USERS_STRING: 'RodolfoGS awinograd hesyifei LinusU SimenB actuallymentor derekstavis wscotten wcandillon tevonsb MaRaSu devashishsethia bndkt'
+
+jobs:
+  test-contains:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        login:
+          - LinusU
+          - Linus
+          - SimenB
+          - Simen
+          - mentor
+          - Rodolfo
+          - randomuser
+
+    steps:
+      - name: Show current test case
+        run: |
+          echo "testing login=${{ matrix.login }}"
+          echo "TRUSTED_USERS_STRING=$TRUSTED_USERS_STRING"
+
+      - name: String contains matched
+        if: ${{ contains(env.TRUSTED_USERS_STRING, matrix.login) }}
+        run: echo "string contains == true for ${{ matrix.login }}"
+
+      - name: String contains not matched
+        if: ${{ !contains(env.TRUSTED_USERS_STRING, matrix.login) }}
+        run: echo "string contains == false for ${{ matrix.login }}"
