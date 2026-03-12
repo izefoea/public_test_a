@@ -1,0 +1,75 @@
+name: Test non_english_comments env injection
+
+on:
+  workflow_dispatch:
+
+jobs:
+  reproduce:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Prepare simulated malicious file
+        run: |
+          mkdir -p src
+          cat > src/evil.txt <<'TXT'
+          正常中文
+          EOF
+          BASH_ENV=./evil.sh
+          更多中文
+          TXT
+
+          cat > evil.sh <<'SH'
+          echo "[evil.sh] BASH_ENV hook executed"
+          touch /tmp/bashed_from_env
+          SH
+
+          echo "=== raw file content ==="
+          cat -n src/evil.txt
+
+      - name: Reproduce original formatting logic
+        run: |
+          set -e
+          pattern='[\p{Han}]'
+          file="src/evil.txt"
+
+          grep_output=$(grep -PnH "$pattern" "$file" || true)
+          echo "=== grep_output ==="
+          printf '%s\n' "$grep_output"
+
+          formatted_output=$(echo "$grep_output" | sed 's/^\(.*:[0-9]\+\):/\1\t/')
+          echo "=== formatted_output ==="
+          printf '%s\n' "$formatted_output"
+
+          echo "$formatted_output" >> non_english_comments.txt
+
+          echo "=== non_english_comments.txt ==="
+          cat non_english_comments.txt
+
+      - name: Write to GITHUB_ENV exactly like original workflow
+        run: |
+          if [ -f non_english_comments.txt ]; then
+            NON_ENGLISH_COMMENTS=$(cat non_english_comments.txt)
+            echo "NON_ENGLISH_COMMENTS<<EOF" >> "$GITHUB_ENV"
+            echo "$NON_ENGLISH_COMMENTS" >> "$GITHUB_ENV"
+            echo "EOF" >> "$GITHUB_ENV"
+          fi
+
+      - name: Verify whether env injection succeeded
+        run: |
+          echo "=== Step environment check ==="
+          echo "BASH_ENV is: '${BASH_ENV:-<unset>}'"
+
+          echo "=== NON_ENGLISH_COMMENTS ==="
+          printf '%s\n' "$NON_ENGLISH_COMMENTS"
+
+          if [ -f /tmp/bashed_from_env ]; then
+            echo "[FAIL] BASH_ENV hook executed, env injection succeeded."
+            exit 1
+          fi
+
+          if [ -n "${BASH_ENV:-}" ]; then
+            echo "[FAIL] BASH_ENV variable was injected."
+            exit 1
+          fi
+
+          echo "[PASS] Env injection did not succeed."
+          echo "Reason: injected lines are prefixed by grep/sed output, so no standalone 'EOF' delimiter is produced."
