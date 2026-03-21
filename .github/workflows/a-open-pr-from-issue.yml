@@ -24,10 +24,10 @@ jobs:
         uses: peter-evans/create-pull-request@v8
         with:
           # 方案1：先用默认 token 测
-          token: ${{ secrets.GITHUB_TOKEN }}
+          # token: ${{ secrets.GITHUB_TOKEN }}
 
           # 方案2：你要测是否能触发下游 PR workflow，就把上面这行改成：
-          # token: ${{ secrets.TEST_PAT }}
+          token: ${{ secrets.TEST_PAT }}
 
           commit-message: "test: issue ${{ github.event.issue.number }}"
           branch: "test/issue-${{ github.event.issue.number }}"
