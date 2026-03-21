@@ -15,11 +15,12 @@ jobs:
         run: |
           echo "event_name=${{ github.event_name }}"
           echo "pr_number=${{ github.event.pull_request.number }}"
+          echo "pr_user_login=${{ github.event.pull_request.user.login }}"
+          echo "pr_author_association=${{ github.event.pull_request.author_association }}"
           echo "head_repo=${{ github.event.pull_request.head.repo.full_name }}"
           echo "base_repo=${{ github.event.pull_request.base.repo.full_name }}"
-          echo "head_owner=${{ github.event.pull_request.head.repo.owner.login }}"
-          echo "base_owner=${{ github.event.pull_request.base.repo.owner.login }}"
           echo "head_repo_fork=${{ github.event.pull_request.head.repo.fork }}"
+          echo "actor=${{ github.actor }}"
 
       - name: Check whether a secret is present
         run: |
