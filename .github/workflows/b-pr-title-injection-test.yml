@@ -1,0 +1,24 @@
+name: B - PR title injection test
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Show trigger context
+        run: |
+          echo "PR #${{ github.event.pull_request.number }}"
+          echo "head repo: ${{ github.event.pull_request.head.repo.full_name }}"
+          echo "is fork: ${{ github.event.pull_request.head.repo.fork }}"
+
+      - name: Deliberately unsafe echo of PR title
+        run: |
+          echo "About to print PR title unsafely"
+          echo "${{ github.event.pull_request.title }}"
+          echo "Done"
