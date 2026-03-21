@@ -1,4 +1,4 @@
-name: B - PR title injection test
+name: B - PR context and title test
 
 on:
   pull_request:
@@ -8,16 +8,28 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  inspect:
     runs-on: ubuntu-latest
     steps:
-      - name: Show trigger context
+      - name: Print PR trust context
         run: |
-          echo "PR #${{ github.event.pull_request.number }}"
-          echo "head repo: ${{ github.event.pull_request.head.repo.full_name }}"
-          echo "is fork: ${{ github.event.pull_request.head.repo.fork }}"
+          echo "event_name=${{ github.event_name }}"
+          echo "pr_number=${{ github.event.pull_request.number }}"
+          echo "head_repo=${{ github.event.pull_request.head.repo.full_name }}"
+          echo "base_repo=${{ github.event.pull_request.base.repo.full_name }}"
+          echo "head_owner=${{ github.event.pull_request.head.repo.owner.login }}"
+          echo "base_owner=${{ github.event.pull_request.base.repo.owner.login }}"
+          echo "head_repo_fork=${{ github.event.pull_request.head.repo.fork }}"
 
-      - name: Deliberately unsafe echo of PR title
+      - name: Check whether a secret is present
+        run: |
+          if [ -n "${{ secrets.TEST_SECRET }}" ]; then
+            echo "TEST_SECRET_PRESENT=yes"
+          else
+            echo "TEST_SECRET_PRESENT=no"
+          fi
+
+      - name: Deliberately unsafe PR title sink
         run: |
           echo "About to print PR title unsafely"
           echo "${{ github.event.pull_request.title }}"
