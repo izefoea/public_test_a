@@ -1,0 +1,39 @@
+name: A - open PR from issue
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  make-pr:
+    if: startsWith(github.event.issue.title, '[test]')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Make a trivial change
+        run: |
+          mkdir -p testdata
+          printf 'issue=%s\n' '${{ github.event.issue.number }}' > testdata/issue-${{ github.event.issue.number }}.txt
+
+      - name: Create PR with issue title
+        uses: peter-evans/create-pull-request@v8
+        with:
+          # 方案1：先用默认 token 测
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+          # 方案2：你要测是否能触发下游 PR workflow，就把上面这行改成：
+          # token: ${{ secrets.TEST_PAT }}
+
+          commit-message: "test: issue ${{ github.event.issue.number }}"
+          branch: "test/issue-${{ github.event.issue.number }}"
+          title: "${{ github.event.issue.title }}"
+          body: |
+            Generated from issue #${{ github.event.issue.number }}
+
+            Original title:
+            ${{ github.event.issue.title }}
