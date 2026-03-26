@@ -16,7 +16,7 @@ jobs:
     steps:
       - name: Fetch PR data
         id: pr
-        uses: octokit/request-action@v3
+        uses: octokit/request-action@main
         with:
           route: GET /repos/{repo}/pulls/{number}
           repo: ${{ github.repository }}
