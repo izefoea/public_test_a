@@ -1,0 +1,69 @@
+name: observe pr actor
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Print core context fields
+        run: |
+          echo "github.actor=${{ github.actor }}"
+          echo "github.triggering_actor=${{ github.triggering_actor }}"
+          echo "github.event_name=${{ github.event_name }}"
+          echo "github.ref=${{ github.ref }}"
+          echo "github.repository=${{ github.repository }}"
+
+      - name: Print PR-specific fields
+        run: |
+          echo "pr.user.login=${{ github.event.pull_request.user.login }}"
+          echo "pr.user.type=${{ github.event.pull_request.user.type }}"
+          echo "pr.author_association=${{ github.event.pull_request.author_association }}"
+          echo "pr.head.repo.full_name=${{ github.event.pull_request.head.repo.full_name }}"
+          echo "pr.head.repo.fork=${{ github.event.pull_request.head.repo.fork }}"
+          echo "pr.base.repo.full_name=${{ github.event.pull_request.base.repo.full_name }}"
+
+      - name: Dump selected event JSON
+        env:
+          PR_USER: ${{ github.event.pull_request.user.login }}
+          PR_TYPE: ${{ github.event.pull_request.user.type }}
+          AUTHOR_ASSOC: ${{ github.event.pull_request.author_association }}
+          ACTOR: ${{ github.actor }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+        run: |
+          cat <<EOF
+          actor=$ACTOR
+          triggering_actor=$TRIGGERING_ACTOR
+          pr_user=$PR_USER
+          pr_user_type=$PR_TYPE
+          author_association=$AUTHOR_ASSOC
+          EOF
+
+      - name: Comment findings back to PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = [
+              'Actor observation:',
+              `- github.actor: ${process.env.GITHUB_ACTOR}`,
+              `- github.triggering_actor: ${process.env.GITHUB_TRIGGERING_ACTOR}`,
+              `- pull_request.user.login: ${context.payload.pull_request.user.login}`,
+              `- pull_request.user.type: ${context.payload.pull_request.user.type}`,
+              `- author_association: ${context.payload.pull_request.author_association}`,
+              `- head.repo.full_name: ${context.payload.pull_request.head.repo.full_name}`,
+              `- head.repo.fork: ${context.payload.pull_request.head.repo.fork}`,
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body,
+            });
