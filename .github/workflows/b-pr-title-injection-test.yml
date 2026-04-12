@@ -1,0 +1,37 @@
+name: B - PR context and title test
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print PR trust context
+        run: |
+          echo "event_name=${{ github.event_name }}"
+          echo "pr_number=${{ github.event.pull_request.number }}"
+          echo "pr_user_login=${{ github.event.pull_request.user.login }}"
+          echo "pr_author_association=${{ github.event.pull_request.author_association }}"
+          echo "head_repo=${{ github.event.pull_request.head.repo.full_name }}"
+          echo "base_repo=${{ github.event.pull_request.base.repo.full_name }}"
+          echo "head_repo_fork=${{ github.event.pull_request.head.repo.fork }}"
+          echo "actor=${{ github.actor }}"
+
+      - name: Check whether a secret is present
+        run: |
+          if [ -n "${{ secrets.TEST_SECRET }}" ]; then
+            echo "TEST_SECRET_PRESENT=yes"
+          else
+            echo "TEST_SECRET_PRESENT=no"
+          fi
+
+      - name: Deliberately unsafe PR title sink
+        run: |
+          echo "About to print PR title unsafely"
+          echo "${{ github.event.pull_request.title }}"
+          echo "Done"

@@ -1,0 +1,23 @@
+name: WR Branch Filter Probe - head
+
+on:
+  workflow_run:
+    workflows: ["PR Branch Probe Upstream"]
+    types: [completed]
+    branches: ["wr-probe/head"]
+
+jobs:
+  dump-workflow-run-context:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+
+    steps:
+      - name: Print workflow_run context
+        run: |
+          echo "This workflow fired."
+          echo "workflow_run.event=${{ github.event.workflow_run.event }}"
+          echo "workflow_run.head_branch=${{ github.event.workflow_run.head_branch }}"
+          echo "workflow_run.head_sha=${{ github.event.workflow_run.head_sha }}"
+          echo "workflow_run.pull_requests=${{ toJson(github.event.workflow_run.pull_requests) }}"

@@ -1,0 +1,40 @@
+name: Fork PR workflow_run main-filter
+
+on:
+  workflow_run:
+    workflows: ["Fork PR Upstream Probe"]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  main_filter:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+
+    steps:
+      - name: Print workflow_run context
+        env:
+          WR_JSON: ${{ toJson(github.event.workflow_run) }}
+          EVENT_JSON: ${{ toJson(github.event) }}
+        run: |
+          echo "MAIN-FILTER WORKFLOW FIRED"
+          echo "workflow_run.event=${{ github.event.workflow_run.event }}"
+          echo "workflow_run.conclusion=${{ github.event.workflow_run.conclusion }}"
+          echo "workflow_run.head_branch=${{ github.event.workflow_run.head_branch }}"
+          echo "workflow_run.head_sha=${{ github.event.workflow_run.head_sha }}"
+          echo "workflow_run.head_repository=${{ github.event.workflow_run.head_repository.full_name }}"
+          echo "workflow_run.repository=${{ github.event.workflow_run.repository.full_name }}"
+          echo "workflow_run.pull_requests=${{ toJson(github.event.workflow_run.pull_requests) }}"
+
+          printf '%s\n' "$WR_JSON" > workflow_run.json
+          printf '%s\n' "$EVENT_JSON" > event.json
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fork-pr-workflow-run-main
+          path: |
+            workflow_run.json
+            event.json

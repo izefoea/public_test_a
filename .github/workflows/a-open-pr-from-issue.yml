@@ -1,0 +1,38 @@
+name: A - create PR from issue
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  create-pr:
+    if: startsWith(github.event.issue.title, '[test]')
+    runs-on: ubuntu-latest
+    env:
+      TEST_MODE: same-repo
+      # TEST_MODE: fork
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Make a trivial change
+        run: |
+          mkdir -p testdata
+          printf 'issue=%s\n' '${{ github.event.issue.number }}' > testdata/issue-${{ github.event.issue.number }}.txt
+
+      - name: Create PR in same repository
+        if: env.TEST_MODE == 'same-repo'
+        uses: peter-evans/create-pull-request@v8
+        with:
+          # 先测试 PAT，确保后续 PR workflow 会触发
+          token: ${{ secrets.TEST_PAT }}
+          commit-message: "test: issue ${{ github.event.issue.number }}"
+          branch: "test/issue-${{ github.event.issue.number }}"
+          title: "${{ github.event.issue.title }}"
+          body: |
+            Generated from issue #${{ github.event.issue.number }}
+            Original title:
+            ${{ github.event.issue.title }}

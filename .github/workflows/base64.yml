@@ -1,0 +1,53 @@
+name: test-secret-masking
+
+on:
+  workflow_dispatch:
+
+jobs:
+  mask-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print raw and derived forms
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          echo "=== raw secret ==="
+          echo "$GITHUB_TOKEN"
+
+          echo "=== base64(secret) ==="
+          printf '%s' "$GITHUB_TOKEN" | base64
+
+          echo "=== base64(user:secret) ==="
+          printf 'dummyuser:%s' "$GITHUB_TOKEN" | base64
+
+      - name: Simulate curl basic auth header
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          basic=$(printf 'dummyuser:%s' "$GITHUB_TOKEN" | base64 | tr -d '\n')
+          echo "Authorization: Basic $basic"
+
+      - name: Compare with explicit add-mask
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          b64_secret=$(printf '%s' "$GITHUB_TOKEN" | base64 | tr -d '\n')
+          b64_basic=$(printf 'dummyuser:%s' "$GITHUB_TOKEN" | base64 | tr -d '\n')
+
+          echo "::add-mask::$b64_secret"
+          echo "::add-mask::$b64_basic"
+
+          echo "=== after add-mask: base64(secret) ==="
+          echo "$b64_secret"
+
+          echo "=== after add-mask: basic header payload ==="
+          echo "$b64_basic"
