@@ -1,0 +1,53 @@
+name: Fork PR Upstream Probe
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Print PR context
+        run: |
+          echo "event_name=$GITHUB_EVENT_NAME"
+          echo "ref=$GITHUB_REF"
+          echo "ref_name=$GITHUB_REF_NAME"
+          echo "base_ref=$GITHUB_BASE_REF"
+          echo "head_ref=$GITHUB_HEAD_REF"
+          echo "base_repo=${{ github.repository }}"
+          echo "head_repo=${{ github.event.pull_request.head.repo.full_name }}"
+          echo "base_branch=${{ github.event.pull_request.base.ref }}"
+          echo "head_branch=${{ github.event.pull_request.head.ref }}"
+          echo "head_sha=${{ github.event.pull_request.head.sha }}"
+
+      - name: Save probe files
+        env:
+          GH_EVENT_JSON: ${{ toJson(github.event) }}
+          GH_CONTEXT_JSON: ${{ toJson(github) }}
+        run: |
+          mkdir -p out
+          cat > out/summary.txt <<EOF
+          event_name=$GITHUB_EVENT_NAME
+          ref=$GITHUB_REF
+          ref_name=$GITHUB_REF_NAME
+          base_ref=$GITHUB_BASE_REF
+          head_ref=$GITHUB_HEAD_REF
+          base_repo=${{ github.repository }}
+          head_repo=${{ github.event.pull_request.head.repo.full_name }}
+          base_branch=${{ github.event.pull_request.base.ref }}
+          head_branch=${{ github.event.pull_request.head.ref }}
+          head_sha=${{ github.event.pull_request.head.sha }}
+          EOF
+
+          printf '%s\n' "$GH_EVENT_JSON" > out/event.json
+          printf '%s\n' "$GH_CONTEXT_JSON" > out/github-context.json
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fork-pr-upstream-probe
+          path: out/
