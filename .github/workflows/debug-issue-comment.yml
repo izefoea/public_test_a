@@ -1,0 +1,53 @@
+name: Debug issue_comment payload
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+jobs:
+  debug:
+    if: |
+      github.event.issue.pull_request &&
+      contains(github.event.comment.body, '/debug-issue-comment')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Print selected fields
+        run: |
+          echo "event_name=${{ github.event_name }}"
+          echo "issue.number=${{ github.event.issue.number }}"
+          echo "issue.pull_request exists? ${{ github.event.issue.pull_request != null }}"
+          echo "top-level pull_request.number=${{ github.event.pull_request.number }}"
+          echo "top-level pull_request json=${{ toJson(github.event.pull_request) }}"
+          echo "issue.pull_request json=${{ toJson(github.event.issue.pull_request) }}"
+
+      - name: Dump full event payload
+        run: |
+          echo "GITHUB_EVENT_PATH=$GITHUB_EVENT_PATH"
+          jq '{
+            action,
+            issue_number: .issue.number,
+            issue_pull_request: .issue.pull_request,
+            top_level_pull_request: .pull_request,
+            comment_body: .comment.body,
+            author_association: .comment.author_association
+          }' "$GITHUB_EVENT_PATH"
+
+      - name: Fetch full PR object
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/${{ github.repository }}/pulls/${{ github.event.issue.number }} \
+            --jq '{
+              number,
+              head_ref: .head.ref,
+              head_sha: .head.sha,
+              head_repo: .head.repo.full_name,
+              base_ref: .base.ref,
+              user: .user.login
+            }'
