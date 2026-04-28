@@ -1,22 +1,22 @@
 name: Encode secret with Base64
 
 on:
-  workflow_dispatch:  # 手动触发
+  workflow_dispatch:
 
 jobs:
   encode-secret:
-    runs-on: ubuntu-latest  # 使用 Ubuntu，自带 base64 命令
+    runs-on: ubuntu-latest
     env:
-      MY_SECRET: ${{ secrets.GITHUB_TOKEN }}   # 将 secret 放入环境变量
+      MY_SECRET: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Print original secret (may be masked by GitHub)
-        run: echo "Original: $MY_SECRET"
+        run: "echo \"Original: $MY_SECRET\""
 
       - name: Base64 once
-        run: echo "Base64 (1x): $(echo -n "$MY_SECRET" | base64)"
+        run: "echo \"Base64 (1x): $(echo -n \"$MY_SECRET\" | base64)\""
 
       - name: Base64 twice
-        run: echo "Base64 (2x): $(echo -n "$MY_SECRET" | base64 | base64)"
+        run: "echo \"Base64 (2x): $(echo -n \"$MY_SECRET\" | base64 | base64)\""
 
       - name: Base64 thrice
-        run: echo "Base64 (3x): $(echo -n "$MY_SECRET" | base64 | base64 | base64)"
+        run: "echo \"Base64 (3x): $(echo -n \"$MY_SECRET\" | base64 | base64 | base64)\""
