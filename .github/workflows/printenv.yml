@@ -1,0 +1,20 @@
+name: Print Environment Variables
+
+on:
+  workflow_dispatch:  # 允许手动触发工作流
+
+jobs:
+  print-env:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Display environment variables
+        shell: bash  # 使用 bash 确保跨平台一致性（Windows 上会自动使用 Git Bash）
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            set
+          else
+            printenv
+          fi
