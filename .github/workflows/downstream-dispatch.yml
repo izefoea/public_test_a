@@ -22,13 +22,11 @@ jobs:
           echo "Encoding secret: ${{ inputs.secret_name }}"
           echo "Extra data: ${{ inputs.extra_data }}"
 
-      - name: Double-base64 encode the secret
+      - name: Trigger workflow_dispatch via API (Corrected)
         env:
-          SECRET_VALUE: ${{ secrets[inputs.secret_name] }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
         run: |
-          if [ -n "$SECRET_VALUE" ]; then
-            echo "Double base64 encoded result:"
-            printf '%s' "$SECRET_VALUE" | base64 -w0 | base64 -w0
-          else
-            echo "Secret '${{ inputs.secret_name }}' is not defined in this repository"
-          fi
+          # 创建一个 JSON 对象作为请求体，并通过标准输入传递给 gh api
+          echo '{"ref":"main","inputs":{"triggered_by":"pull_request_target"}}' | \
+            gh api repos/$REPO/actions/workflows/downstream-dispatch.yml/dispatches --input -
