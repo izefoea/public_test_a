@@ -7,18 +7,28 @@ on:
     types: [opened]
   issue_comment:
     types: [created]
+  discussion:
+    types: [created, edited, answered]
+  discussion_comment:
+    types: [created]
 
 permissions:
-  actions: write   # 必须，才能触发 workflow_dispatch
+  actions: write    # create workflow_dispatch
+  contents: write   # create repository_dispatch
 
 jobs:
-  trigger_downstream:
+  trigger_downstreams:
     runs-on: ubuntu-latest
     steps:
       - name: Show trigger event
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_ACTION: ${{ github.event.action }}
+          NUMBER: ${{ github.event.number || github.event.issue.number || github.event.discussion.number }}
         run: |
-          echo "Triggered by: ${{ github.event_name }}"
-          echo "PR/Issue number: ${{ github.event.number || github.event.issue.number }}"
+          echo "Triggered by: $EVENT_NAME"
+          echo "Action: $EVENT_ACTION"
+          echo "Number: $NUMBER"
 
       - name: Trigger workflow_dispatch downstream via API
         env:
@@ -26,8 +36,35 @@ jobs:
           REPO: ${{ github.repository }}
           REF_NAME: ${{ github.ref_name }}
           EVENT_NAME: ${{ github.event_name }}
+          EVENT_ACTION: ${{ github.event.action }}
+          NUMBER: ${{ github.event.number || github.event.issue.number || github.event.discussion.number }}
+          ACTOR: ${{ github.actor }}
         run: |
           gh api "repos/$REPO/actions/workflows/downstream-dispatch.yml/dispatches" \
             --method POST \
             --field "ref=$REF_NAME" \
-            --field "inputs[triggered_by]=$EVENT_NAME"
+            --field "inputs[triggered_by]=$EVENT_NAME" \
+            --field "inputs[action]=$EVENT_ACTION" \
+            --field "inputs[number]=$NUMBER" \
+            --field "inputs[actor]=$ACTOR"
+
+      - name: Trigger repository_dispatch downstream via API
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_ACTION: ${{ github.event.action }}
+          REF_NAME: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+          ACTOR: ${{ github.actor }}
+          NUMBER: ${{ github.event.number || github.event.issue.number || github.event.discussion.number }}
+        run: |
+          gh api "repos/$REPO/dispatches" \
+            --method POST \
+            --field "event_type=upstream-triggered" \
+            --field "client_payload[triggered_by]=$EVENT_NAME" \
+            --field "client_payload[action]=$EVENT_ACTION" \
+            --field "client_payload[number]=$NUMBER" \
+            --field "client_payload[ref]=$REF_NAME" \
+            --field "client_payload[sha]=$SHA" \
+            --field "client_payload[actor]=$ACTOR"
