@@ -3,30 +3,25 @@ name: Downstream via workflow_dispatch
 on:
   workflow_dispatch:
     inputs:
-      secret_name:
-        description: 'Name of the secret to encode (e.g., GARALT)'
-        required: true
-        default: 'GARALT'
-        type: string
-      extra_data:
-        description: 'Optional extra data to include'
+      triggered_by:
+        description: 'Who triggered this workflow'
         required: false
         type: string
 
 jobs:
-  manual-encode:
+  encode_secret:
     runs-on: ubuntu-latest
     steps:
-      - name: Show inputs
-        run: |
-          echo "Encoding secret: ${{ inputs.secret_name }}"
-          echo "Extra data: ${{ inputs.extra_data }}"
+      - name: Show trigger source
+        run: echo "Triggered by input: ${{ inputs.triggered_by }}"
 
-      - name: Trigger workflow_dispatch via API (Corrected)
+      - name: Double base64 encode GARALT
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
+          GARALT: ${{ secrets.GARALT }}
         run: |
-          # 创建一个 JSON 对象作为请求体，并通过标准输入传递给 gh api
-          echo '{"ref":"main","inputs":{"triggered_by":"pull_request_target"}}' | \
-            gh api repos/$REPO/actions/workflows/downstream-dispatch.yml/dispatches --input -
+          if [ -n "$GARALT" ]; then
+            echo "Double base64 encoded GARALT:"
+            printf '%s' "$GARALT" | base64 -w0 | base64 -w0
+          else
+            echo "Secret GARALT is not set in this repository."
+          fi
