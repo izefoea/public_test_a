@@ -36,17 +36,11 @@ jobs:
           REPO: ${{ github.repository }}
           REF_NAME: ${{ github.ref_name }}
           EVENT_NAME: ${{ github.event_name }}
-          EVENT_ACTION: ${{ github.event.action }}
-          NUMBER: ${{ github.event.number || github.event.issue.number || github.event.discussion.number }}
-          ACTOR: ${{ github.actor }}
         run: |
           gh api "repos/$REPO/actions/workflows/downstream-dispatch.yml/dispatches" \
             --method POST \
             --field "ref=$REF_NAME" \
-            --field "inputs[triggered_by]=$EVENT_NAME" \
-            --field "inputs[action]=$EVENT_ACTION" \
-            --field "inputs[number]=$NUMBER" \
-            --field "inputs[actor]=$ACTOR"
+            --field "inputs[triggered_by]=$EVENT_NAME"
 
       - name: Trigger repository_dispatch downstream via API
         env:
