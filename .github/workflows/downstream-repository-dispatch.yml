@@ -1,0 +1,35 @@
+name: Downstream via repository_dispatch
+
+on:
+  repository_dispatch:
+    types: [upstream-triggered]
+
+permissions:
+  contents: read
+
+jobs:
+  handle_repository_dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Show repository_dispatch payload
+        env:
+          EVENT_TYPE: ${{ github.event.action }}
+          TRIGGERED_BY: ${{ github.event.client_payload.triggered_by }}
+          ACTION: ${{ github.event.client_payload.action }}
+          NUMBER: ${{ github.event.client_payload.number }}
+          REF_NAME: ${{ github.event.client_payload.ref }}
+          SHA: ${{ github.event.client_payload.sha }}
+          ACTOR: ${{ github.event.client_payload.actor }}
+        run: |
+          echo "repository_dispatch event_type: $EVENT_TYPE"
+          echo "Triggered by upstream event: $TRIGGERED_BY"
+          echo "Upstream action: $ACTION"
+          echo "PR/Issue number: $NUMBER"
+          echo "Upstream ref: $REF_NAME"
+          echo "Upstream sha: $SHA"
+          echo "Upstream actor: $ACTOR"
+
+      - name: Example conditional behavior
+        if: ${{ github.event.client_payload.triggered_by == 'pull_request_target' }}
+        run: |
+          echo "This downstream run was triggered from a pull_request_target upstream workflow."
