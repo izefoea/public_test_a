@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Show trigger source
-        run: echo "Triggered by input: ${{ inputs.triggered_by }}"
+        run: echo "1"
 
       - name: Double base64 encode GARALT
         env:
